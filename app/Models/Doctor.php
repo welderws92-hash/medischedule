@@ -17,12 +17,12 @@ class Doctor extends Model
         'is_active',
     ];
 
-    protected function casts(): array
-    {
-        return [
-            'is_active' => 'boolean',
-        ];
-    }
+   protected function casts(): array
+{
+    return [
+        'is_active' => 'boolean',
+    ];
+}
 
     public function user(): BelongsTo
     {
