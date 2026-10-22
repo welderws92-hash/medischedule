@@ -191,5 +191,81 @@ class AppointmentConflictTest extends TestCase
         $this->assertFalse($hasConflict);
     }
 
+    public function test_allows_appointment_inside_doctor_schedule(): void
+    {
+        $doctorUser = User::factory()->create([
+            'role' => 'doctor',
+        ]);
+
+        $specialty = Specialty::create([
+            'name' => 'Ortopedia',
+        ]);
+
+        $doctor = Doctor::create([
+            'user_id' => $doctorUser->id,
+            'specialty_id' => $specialty->id,
+            'crm' => 'CRM-TESTE-006',
+            'is_active' => true,
+        ]);
+
+        \App\Models\DoctorSchedule::create([
+            'doctor_id' => $doctor->id,
+            'weekday' => 2,
+            'start_time' => '08:00',
+            'end_time' => '17:00',
+            'slot_duration_minutes' => 30,
+            'is_active' => true,
+        ]);
+
+        $service = new AppointmentService();
+
+        $fits = $service->fitsDoctorSchedule(
+            $doctor->id,
+            '2026-11-10',
+            '09:00',
+            '09:30'
+        );
+
+        $this->assertTrue($fits);
+    }
+
+    public function test_rejects_appointment_ending_after_doctor_schedule(): void
+    {
+        $doctorUser = User::factory()->create([
+            'role' => 'doctor',
+        ]);
+
+        $specialty = Specialty::create([
+            'name' => 'Oftalmologia',
+        ]);
+
+        $doctor = Doctor::create([
+            'user_id' => $doctorUser->id,
+            'specialty_id' => $specialty->id,
+            'crm' => 'CRM-TESTE-007',
+            'is_active' => true,
+        ]);
+
+        \App\Models\DoctorSchedule::create([
+            'doctor_id' => $doctor->id,
+            'weekday' => 2,
+            'start_time' => '08:00',
+            'end_time' => '17:00',
+            'slot_duration_minutes' => 30,
+            'is_active' => true,
+        ]);
+
+        $service = new AppointmentService();
+
+        $fits = $service->fitsDoctorSchedule(
+            $doctor->id,
+            '2026-11-10',
+            '16:45',
+            '17:15'
+        );
+
+        $this->assertFalse($fits);
+    }
+
 
 }

@@ -3,7 +3,8 @@
 namespace App\Services;
 
 use App\Models\Appointment;
-use Illuminate\Database\Eloquent\Builder;
+use App\Models\DoctorSchedule;
+use Carbon\Carbon;
 
 class AppointmentService
 {
@@ -40,6 +41,26 @@ class AppointmentService
             ->where('status', '!=', 'canceled')
             ->where('start_time', '<', $endTime)
             ->where('end_time', '>', $startTime)
+            ->exists();
+    }
+
+    /**
+     * Verifica se a consulta cabe no horário ativo do médico.
+     */
+    public function fitsDoctorSchedule(
+        int $doctorId,
+        string $date,
+        string $startTime,
+        string $endTime
+    ): bool {
+        $weekday = Carbon::parse($date)->dayOfWeek;
+
+        return DoctorSchedule::query()
+            ->where('doctor_id', $doctorId)
+            ->where('weekday', $weekday)
+            ->where('is_active', true)
+            ->where('start_time', '<=', $startTime)
+            ->where('end_time', '>=', $endTime)
             ->exists();
     }
 }
