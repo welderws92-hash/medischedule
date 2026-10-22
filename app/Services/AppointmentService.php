@@ -45,7 +45,8 @@ class AppointmentService
     }
 
     /**
-     * Verifica se a consulta cabe no horário ativo do médico.
+     * Verifica se a consulta respeita o expediente e os
+     * intervalos de atendimento configurados para o médico.
      */
     public function fitsDoctorSchedule(
         int $doctorId,
@@ -55,12 +56,43 @@ class AppointmentService
     ): bool {
         $weekday = Carbon::parse($date)->dayOfWeek;
 
-        return DoctorSchedule::query()
+        $schedules = DoctorSchedule::query()
             ->where('doctor_id', $doctorId)
             ->where('weekday', $weekday)
             ->where('is_active', true)
             ->where('start_time', '<=', $startTime)
             ->where('end_time', '>=', $endTime)
-            ->exists();
+            ->get();
+
+        foreach ($schedules as $schedule) {
+            $scheduleStart = Carbon::parse($date.' '.$schedule->start_time);
+            $appointmentStart = Carbon::parse($date.' '.$startTime);
+            $appointmentEnd = Carbon::parse($date.' '.$endTime);
+
+            $duration = $schedule->slot_duration_minutes;
+
+            if ($duration <= 0) {
+                continue;
+            }
+
+            $minutesFromStart = (int) $scheduleStart->diffInMinutes(
+                $appointmentStart,
+                false
+            );
+
+            $appointmentDuration = (int) $appointmentStart->diffInMinutes(
+                $appointmentEnd,
+                false
+            );
+            if (
+                $minutesFromStart >= 0
+                && $minutesFromStart % $duration === 0
+                && $appointmentDuration === $duration
+            ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

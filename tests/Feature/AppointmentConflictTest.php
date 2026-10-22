@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Appointment;
 use App\Models\Doctor;
+use App\Models\DoctorSchedule;
 use App\Models\Specialty;
 use App\Models\User;
 use App\Services\AppointmentService;
@@ -13,7 +14,19 @@ use Tests\TestCase;
 class AppointmentConflictTest extends TestCase
 {
     use RefreshDatabase;
- public function test_detects_overlapping_appointment_for_same_doctor(): void
+
+    /**
+     * Teste 1:
+     * Verifica se o sistema identifica duas consultas sobrepostas
+     * para o mesmo médico no mesmo dia.
+     *
+     * Exemplo:
+     * Consulta existente: 14:00 às 14:30.
+     * Nova consulta:      14:15 às 14:45.
+     *
+     * Resultado esperado: existe conflito.
+     */
+    public function test_detects_overlapping_appointment_for_same_doctor(): void
     {
         $patient = User::factory()->create([
             'role' => 'patient',
@@ -41,9 +54,10 @@ class AppointmentConflictTest extends TestCase
             'start_time' => '14:00',
             'end_time' => '14:30',
             'status' => 'scheduled',
+
         ]);
 
-        $service = new AppointmentService();
+        $service = new AppointmentService;
 
         $hasConflict = $service->doctorHasConflict(
             $doctor->id,
@@ -54,19 +68,33 @@ class AppointmentConflictTest extends TestCase
 
         $this->assertTrue($hasConflict);
     }
-    
+
+    /**
+     * Teste 2:
+     * Verifica se o sistema permite consultas consecutivas
+     * para o mesmo médico, sem sobreposição.
+     *
+     * Exemplo:
+     * Consulta existente: 14:00 às 14:30.
+     * Nova consulta:      14:30 às 15:00.
+     *
+     * Resultado esperado: não existe conflito.
+     */
     public function test_allows_appointment_starting_when_previous_one_ends(): void
     {
         $patient = User::factory()->create([
             'role' => 'patient',
+
         ]);
 
         $doctorUser = User::factory()->create([
             'role' => 'doctor',
+
         ]);
 
         $specialty = Specialty::create([
             'name' => 'Pediatria',
+
         ]);
 
         $doctor = Doctor::create([
@@ -74,6 +102,7 @@ class AppointmentConflictTest extends TestCase
             'specialty_id' => $specialty->id,
             'crm' => 'CRM-TESTE-002',
             'is_active' => true,
+
         ]);
 
         Appointment::create([
@@ -85,7 +114,7 @@ class AppointmentConflictTest extends TestCase
             'status' => 'scheduled',
         ]);
 
-        $service = new AppointmentService();
+        $service = new AppointmentService;
 
         $hasConflict = $service->doctorHasConflict(
             $doctor->id,
@@ -96,7 +125,19 @@ class AppointmentConflictTest extends TestCase
 
         $this->assertFalse($hasConflict);
     }
-   public function test_detects_overlapping_appointments_for_same_patient_with_different_doctors(): void
+
+    /**
+     * Teste 3:
+     * Verifica se o sistema impede que o mesmo paciente tenha
+     * duas consultas sobrepostas com médicos diferentes.
+     *
+     * Exemplo:
+     * Consulta existente com o primeiro médico: 14:00 às 14:30.
+     * Nova consulta com outro médico:           14:15 às 14:45.
+     *
+     * Resultado esperado: existe conflito para o paciente.
+     */
+    public function test_detects_overlapping_appointments_for_same_patient_with_different_doctors(): void
     {
         $patient = User::factory()->create([
             'role' => 'patient',
@@ -137,7 +178,7 @@ class AppointmentConflictTest extends TestCase
             'status' => 'scheduled',
         ]);
 
-        $service = new AppointmentService();
+        $service = new AppointmentService;
 
         $hasConflict = $service->patientHasConflict(
             $patient->id,
@@ -149,6 +190,17 @@ class AppointmentConflictTest extends TestCase
         $this->assertTrue($hasConflict);
     }
 
+    /**
+     * Teste 4:
+     * Verifica se o mesmo paciente pode marcar uma consulta
+     * que começa exatamente quando a consulta anterior termina.
+     *
+     * Exemplo:
+     * Consulta existente: 14:00 às 14:30.
+     * Nova consulta:      14:30 às 15:00.
+     *
+     * Resultado esperado: não existe conflito para o paciente.
+     */
     public function test_allows_patient_appointment_when_previous_one_ends(): void
     {
         $patient = User::factory()->create([
@@ -179,7 +231,7 @@ class AppointmentConflictTest extends TestCase
             'status' => 'scheduled',
         ]);
 
-        $service = new AppointmentService();
+        $service = new AppointmentService;
 
         $hasConflict = $service->patientHasConflict(
             $patient->id,
@@ -191,6 +243,16 @@ class AppointmentConflictTest extends TestCase
         $this->assertFalse($hasConflict);
     }
 
+    /**
+     * Teste 5:
+     * Verifica se uma consulta que está inteiramente dentro
+     * do horário ativo do médico é considerada válida.
+     *
+     * Expediente cadastrado: 08:00 às 17:00.
+     * Consulta solicitada:   09:00 às 09:30.
+     *
+     * Resultado esperado: a consulta cabe no expediente.
+     */
     public function test_allows_appointment_inside_doctor_schedule(): void
     {
         $doctorUser = User::factory()->create([
@@ -208,7 +270,7 @@ class AppointmentConflictTest extends TestCase
             'is_active' => true,
         ]);
 
-        \App\Models\DoctorSchedule::create([
+        DoctorSchedule::create([
             'doctor_id' => $doctor->id,
             'weekday' => 2,
             'start_time' => '08:00',
@@ -217,7 +279,7 @@ class AppointmentConflictTest extends TestCase
             'is_active' => true,
         ]);
 
-        $service = new AppointmentService();
+        $service = new AppointmentService;
 
         $fits = $service->fitsDoctorSchedule(
             $doctor->id,
@@ -229,6 +291,16 @@ class AppointmentConflictTest extends TestCase
         $this->assertTrue($fits);
     }
 
+    /**
+     * Teste 6:
+     * Verifica se o sistema rejeita uma consulta que termina
+     * depois do encerramento do expediente do médico.
+     *
+     * Expediente cadastrado: 08:00 às 17:00.
+     * Consulta solicitada:   16:45 às 17:15.
+     *
+     * Resultado esperado: a consulta não cabe no expediente.
+     */
     public function test_rejects_appointment_ending_after_doctor_schedule(): void
     {
         $doctorUser = User::factory()->create([
@@ -246,7 +318,7 @@ class AppointmentConflictTest extends TestCase
             'is_active' => true,
         ]);
 
-        \App\Models\DoctorSchedule::create([
+        DoctorSchedule::create([
             'doctor_id' => $doctor->id,
             'weekday' => 2,
             'start_time' => '08:00',
@@ -255,7 +327,7 @@ class AppointmentConflictTest extends TestCase
             'is_active' => true,
         ]);
 
-        $service = new AppointmentService();
+        $service = new AppointmentService;
 
         $fits = $service->fitsDoctorSchedule(
             $doctor->id,
@@ -267,5 +339,52 @@ class AppointmentConflictTest extends TestCase
         $this->assertFalse($fits);
     }
 
+    /**
+     * Teste 7:
+     * Verifica se o sistema rejeita uma consulta que começa
+     * fora dos intervalos de 30 minutos cadastrados.
+     *
+     * Expediente: 08:00 às 17:00.
+     * Duração configurada: 30 minutos.
+     * Consulta solicitada: 08:10 às 08:40.
+     *
+     * Resultado esperado: horário inválido.
+     */
+    public function test_rejects_appointment_outside_slot_intervals(): void
+    {
+        $doctorUser = User::factory()->create([
+            'role' => 'doctor',
+        ]);
 
+        $specialty = Specialty::create([
+            'name' => 'Cardiologia',
+        ]);
+
+        $doctor = Doctor::create([
+            'user_id' => $doctorUser->id,
+            'specialty_id' => $specialty->id,
+            'crm' => 'CRM-TESTE-008',
+            'is_active' => true,
+        ]);
+
+        DoctorSchedule::create([
+            'doctor_id' => $doctor->id,
+            'weekday' => 2,
+            'start_time' => '08:00',
+            'end_time' => '17:00',
+            'slot_duration_minutes' => 30,
+            'is_active' => true,
+        ]);
+
+        $service = new AppointmentService;
+
+        $fits = $service->fitsDoctorSchedule(
+            $doctor->id,
+            '2026-11-10',
+            '08:10',
+            '08:40'
+        );
+
+        $this->assertFalse($fits);
+    }
 }
