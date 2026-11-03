@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\DoctorController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Admin\PatientController;
 
 // Página inicial
 Route::get('/', function () {
@@ -29,6 +30,20 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
         ->name('admin.doctors.create');
     Route::post('/admin/doctors', [DoctorController::class, 'store'])
         ->name('admin.doctors.store');
+    Route::get('/admin/patients', [PatientController::class, 'index'])
+        ->name('admin.patients.index');
+    Route::get('/admin/patients/create', [PatientController::class, 'create'])
+        ->name('admin.patients.create');
+    Route::post('/admin/patients', [PatientController::class, 'store'])
+        ->name('admin.patients.store');
+    Route::get('/admin/patients/{patient}/edit', [PatientController::class, 'edit'])
+        ->name('admin.patients.edit');
+    Route::put('/admin/patients/{patient}', [PatientController::class, 'update'])
+        ->name('admin.patients.update');
+    Route::patch('/admin/patients/{patient}/status', [PatientController::class, 'toggleStatus'])
+        ->name('admin.patients.toggle-status');
+    Route::delete('/admin/patients/{patient}', [PatientController::class, 'destroy'])
+        ->name('admin.patients.destroy');
 });
 
 // Painel do médico
