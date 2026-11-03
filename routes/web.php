@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\DoctorController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
@@ -22,6 +23,12 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
     Route::get('/admin/dashboard', function () {
         return view('dashboard.admin');
     })->name('admin.dashboard');
+    Route::get('/admin/doctors', [DoctorController::class, 'index'])
+        ->name('admin.doctors.index');
+    Route::get('/admin/doctors/create', [DoctorController::class, 'create'])
+        ->name('admin.doctors.create');
+    Route::post('/admin/doctors', [DoctorController::class, 'store'])
+        ->name('admin.doctors.store');
 });
 
 // Painel do médico
